@@ -41,11 +41,16 @@ func ConvertTimeToWebVtt(t string) string {
 	return strings.Join(timing, " --> ")
 }
 
-func SrtToWebVtt(l string) string {
+func SrtToWebVtt(l string) (string, error) {
+	ref := l
 	l = strings.Replace(l, "\r\n", "\n", -1)
-	lines := strings.SplitN(l, "\n", 3)[1:]
+	lines := strings.SplitN(l, "\n", 3)
+	if len(lines) < 2 {
+		return "", fmt.Errorf("Invalid line format: |%s|", ref)
+	}
+	lines = lines[1:]
 	lines[0] = ConvertTimeToWebVtt(lines[0])
-	return fmt.Sprintf("%s\n%s", lines[0], lines[1])
+	return fmt.Sprintf("%s\n%s", lines[0], lines[1]), nil
 }
 
 type Reader struct {
@@ -62,6 +67,48 @@ func NewReader(reader io.Reader) (*Reader, error) {
 	return r, nil
 }
 
+type Err struct {
+	err []error
+}
+
+func (e *Err) Error() string {
+	var s string
+	for k := range e.err {
+		s += fmt.Sprintf("%#v\n", e.err[k].Error())
+	}
+	return s
+}
+
+func (r *Reader) WriteTo(w io.Writer) (n int, err error) {
+	n, err = w.Write([]byte("WEBVTT\n\n"))
+	if err != nil {
+		return
+	}
+	var e Err
+	for r.s.Scan() {
+		l := r.s.Text()
+		l, err = SrtToWebVtt(l)
+		if err != nil {
+			e.err = append(e.err, err)
+			// skip line.
+			continue
+		}
+		var i int
+		i, err = w.Write([]byte(l))
+		if err != nil {
+			return n, err
+		}
+		n += i
+	}
+	if e.err != nil {
+		if r.s.Err() != nil {
+			e.err = append(e.err, r.s.Err())
+		}
+		return n, &e
+	}
+	return n, r.s.Err()
+}
+
 func (r *Reader) Read(p []byte) (n int, e error) {
 	var buf bytes.Buffer
 	if r.p == 0 {
@@ -73,7 +120,10 @@ func (r *Reader) Read(p []byte) (n int, e error) {
 
 	for buf.Len() < len(p) && r.s.Scan() {
 		l := r.s.Text()
-		l = SrtToWebVtt(l)
+		l, e = SrtToWebVtt(l)
+		if e != nil {
+			return 0, e
+		}
 		buf.WriteString(l)
 	}
 
