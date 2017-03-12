@@ -68,17 +68,20 @@ func NewReader(reader io.Reader) (*Reader, error) {
 }
 
 type Err struct {
-	err []error
+	Err []error
 }
 
 func (e *Err) Error() string {
 	var s string
-	for k := range e.err {
-		s += fmt.Sprintf("%#v\n", e.err[k].Error())
+	for k := range e.Err {
+		s += fmt.Sprintf("%#v\n", e.Err[k].Error())
 	}
 	return s
 }
 
+// WriteTo writes data to w until the buffer is drained
+// Any error encountered during the write is also returned.
+// Scanning errors are returned into an error of type Err
 func (r *Reader) WriteTo(w io.Writer) (n int, err error) {
 	n, err = w.Write([]byte("WEBVTT\n\n"))
 	if err != nil {
@@ -89,7 +92,7 @@ func (r *Reader) WriteTo(w io.Writer) (n int, err error) {
 		l := r.s.Text()
 		l, err = SrtToWebVtt(l)
 		if err != nil {
-			e.err = append(e.err, err)
+			e.Err = append(e.Err, err)
 			// skip line.
 			continue
 		}
@@ -100,9 +103,9 @@ func (r *Reader) WriteTo(w io.Writer) (n int, err error) {
 		}
 		n += i
 	}
-	if e.err != nil {
+	if e.Err != nil {
 		if r.s.Err() != nil {
-			e.err = append(e.err, r.s.Err())
+			e.Err = append(e.Err, r.s.Err())
 		}
 		return n, &e
 	}
