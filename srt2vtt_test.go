@@ -12,7 +12,10 @@ func TestConvertTimeToWebVtt(t *testing.T) {
 		"01:00:00,579 --> 01:00:02,145": "01:00:00.579 --> 01:00:02.145",
 	}
 	for k, v := range patterns {
-		result := ConvertTimeToWebVtt(k)
+		result, err := ConvertTimeToWebVtt(k)
+		if err != nil {
+			t.Fatal(err)
+		}
 		if result != v {
 			t.Errorf("excepted %q get %q", v, result)
 		}

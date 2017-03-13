@@ -3,6 +3,7 @@ package srt2vtt
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	_ "log"
@@ -30,26 +31,32 @@ func SrtScanner(data []byte, atEOF bool) (advance int, token []byte, err error) 
 	return 0, nil, nil
 }
 
-func ConvertTimeToWebVtt(t string) string {
+func ConvertTimeToWebVtt(t string) (string, error) {
 	t = strings.Replace(t, ",", ".", -1)
 	timing := strings.Split(t, " --> ")
 	for i, v := range timing {
+		if len(v) < 3 {
+			return "", errors.New("Invalid time line")
+		}
 		if v[:3] == "00:" {
 			timing[i] = v[3:]
 		}
 	}
-	return strings.Join(timing, " --> ")
+	return strings.Join(timing, " --> "), nil
 }
 
 func SrtToWebVtt(l string) (string, error) {
-	ref := l
 	l = strings.Replace(l, "\r\n", "\n", -1)
 	lines := strings.SplitN(l, "\n", 3)
 	if len(lines) < 2 {
-		return "", fmt.Errorf("Invalid line format: |%s|", ref)
+		return "", errors.New("Invalid line format")
 	}
+	var err error
 	lines = lines[1:]
-	lines[0] = ConvertTimeToWebVtt(lines[0])
+	lines[0], err = ConvertTimeToWebVtt(lines[0])
+	if err != nil {
+		return "", err
+	}
 	return fmt.Sprintf("%s\n%s", lines[0], lines[1]), nil
 }
 
