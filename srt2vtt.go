@@ -1,15 +1,19 @@
 package srt2vtt
 
 import (
+	"github.com/saintfish/chardet"
+	"golang.org/x/net/html"
+
 	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
-	"golang.org/x/net/html"
 	"io"
 	_ "log"
 	_ "os"
 	"strings"
+
+	log "github.com/golang/glog"
 )
 
 func SrtScanner(data []byte, atEOF bool) (advance int, token []byte, err error) {
@@ -60,9 +64,9 @@ func SrtToWebVtt(l string) (string, error) {
 	}
 	lines[1], err = cleanTags(lines[1])
 	if err != nil {
-		return lines[1], err
+		return "", err
 	}
-	return fmt.Sprintf("%s\n%s", lines[0], lines[1]), nil
+	return fmt.Sprintf("%s\n%s", toUTF8([]byte(lines[0])), toUTF8([]byte(lines[1]))), nil
 }
 
 // cleanTags replaces invalid tags with <b> and encodes characters such &
@@ -207,4 +211,31 @@ func (r *Reader) Read(p []byte) (n int, e error) {
 		return n, io.EOF
 	}
 	return n, nil
+}
+
+func toUTF8(in []byte) string {
+	buf := make([]rune, len(in))
+	for i, b := range in {
+		buf[i] = rune(b)
+	}
+	return string(buf)
+}
+
+func toutf8(s string) (string, error) {
+	dec, err := chardet.NewTextDetector().DetectBest([]byte(s))
+	if err != nil {
+		return "", err
+	}
+	switch dec.Charset {
+	default:
+		log.Errorf("charset %s", dec.Charset)
+	}
+	/*
+		rInUTF8 := transform.NewReader(strings.NewReader(encS), japanese.ShiftJIS.NewDecoder())
+		// decode our string
+		decBytes, _ := ioutil.ReadAll(rInUTF8)
+		decS := string(decBytes)
+		fmt.Println(decS)
+	*/
+	return s, nil
 }
